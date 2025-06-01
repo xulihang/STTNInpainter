@@ -54,6 +54,48 @@ def process_mask(mask_path):
     thresh = cv2.threshold(gray, 60, 255, cv2.THRESH_BINARY)[1]
     cv2.imwrite(mask_path, thresh)
 
+
+@route('/gettxtremoved_folder', method='POST')
+def get_txtremoved_folder():
+    folder_path = request.forms.get('folder')
+    mask = request.files.get('mask')
+    
+    mask_name, mask_ext = os.path.splitext(mask.filename)
+
+    if mask_ext.lower() not in ('.png','.jpg','.jpeg'):
+        return "File extension not allowed."        
+        
+    timestamp=str(int(time.time()*1000))
+    mask_savedName=timestamp+"-mask"+mask_ext
+
+    
+    save_path = "./uploaded/"
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    
+    mask_path = "{path}/{file}".format(path=save_path, file=mask_savedName)
+    mask.save(mask_path)
+    
+    process_mask(mask_path)
+    
+    images = []
+    images_path = []
+    for filename in os.listdir(folder_path):
+        name, ext = os.path.splitext(filename)
+        if ext.lower() not in ('.png','.jpg','.jpeg'):
+            continue
+        path = os.path.join(folder_path,filename)
+        images_path.append(path)
+        images.append(cv2.imread(path))
+        
+    sttn_images_inpaint = sttn_inpaint.STTNImagesInpaint(images, mask_path, clip_gap=config.STTN_MAX_LOAD_NUM)
+    frames = sttn_images_inpaint()
+    frame_index = 0
+    for frame in frames:
+        cv2.imwrite(images_path[frame_index],frame)
+        frame_index = frame_index + 1
+    return "done"
+    
 @route('/<filepath:path>')
 def server_static(filepath):
     return static_file(filepath, root='www')
