@@ -107,5 +107,5 @@ if __name__ == '__main__':
     if len(sys.argv)==2:
         service_port=sys.argv[1]
     else:
-        service_port=8080
+        service_port=8189
     run(host='127.0.0.1', port=service_port)   
