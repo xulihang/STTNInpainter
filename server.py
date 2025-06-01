@@ -45,6 +45,8 @@ def get_txtremoved():
     frames = sttn_images_inpaint()
     inpainted = frames[0]
     cv2.imwrite(output_path, inpainted)
+    os.remove(mask_path)
+    os.remove(origin_path)
     return static_file(ouputName, root='uploaded')
 
     
@@ -94,6 +96,7 @@ def get_txtremoved_folder():
     for frame in frames:
         cv2.imwrite(images_path[frame_index],frame)
         frame_index = frame_index + 1
+    os.remove(mask_path)
     return "done"
     
 @route('/<filepath:path>')
