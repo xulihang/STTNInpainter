@@ -303,21 +303,22 @@ class STTNVideoInpaint:
 class STTNImagesInpaint:
 
     def read_frame_info(self):
-        width = self.images[0].shape[1]
-        height = self.images[0].shape[0]
+        image = cv2.imread(self.images_path[0])
+        width = image.shape[1]
+        height = image.shape[0]
         frame_info = {
             'W_ori': int(width),  # 视频的原始宽度
             'H_ori': int(height),  # 视频的原始高度,
-            'len': int(len(self.images))
+            'len': int(len(self.images_path))
         }
         # 返回视频读取对象、帧信息和视频写入对象
         return frame_info
 
-    def __init__(self, images, mask_path=None, clip_gap=None):
+    def __init__(self, images_path, mask_path=None, clip_gap=None):
         # STTNInpaint视频修复实例初始化
         self.sttn_inpaint = STTNInpaint()
         # 视频和掩码路径
-        self.images = images
+        self.images_path = images_path
         self.mask_path = mask_path
         # 配置可在一次处理中加载的最大帧数
         if clip_gap is None:
@@ -326,8 +327,6 @@ class STTNImagesInpaint:
             self.clip_gap = clip_gap
 
     def __call__(self, input_mask=None, input_sub_remover=None, tbar=None):
-        # 处理好的图片
-        processed_frames = []
         # 读取图片信息
         frame_info = self.read_frame_info()
         # 计算需要迭代修复视频的次数
@@ -343,6 +342,7 @@ class STTNImagesInpaint:
         # 得到修复区域位置
         inpaint_area = self.sttn_inpaint.get_inpaint_area_by_mask(frame_info['H_ori'], split_h, mask)
         image_index = 0
+        written_index = 0
         # 遍历每一次的迭代次数
         for i in range(rec_time):
             start_f = i * self.clip_gap  # 起始帧位置
@@ -356,7 +356,7 @@ class STTNImagesInpaint:
                 frames[k] = []
             # 读取和修复高分辨率帧
             for j in range(start_f, end_f):
-                image = self.images[image_index]
+                image = cv2.imread(self.images_path[image_index])
                 image_index = image_index + 1
                 frames_hr.append(image)
                 for k in range(len(inpaint_area)):
@@ -381,16 +381,16 @@ class STTNImagesInpaint:
                         comp = cv2.cvtColor(np.array(comp).astype(np.uint8), cv2.COLOR_BGR2RGB)
                         mask_area = mask[inpaint_area[k][0]:inpaint_area[k][1], :]
                         frame[inpaint_area[k][0]:inpaint_area[k][1], :, :] = mask_area * comp + (1 - mask_area) * frame[inpaint_area[k][0]:inpaint_area[k][1], :, :]
-                    processed_frames.append(frame)
+                    cv2.imwrite(self.images_path[written_index],frame)
+                    written_index = written_index + 1
                     if input_sub_remover is not None and input_sub_remover.gui_mode:
                         if tbar is not None:
                             input_sub_remover.update_progress(tbar, increment=1)
                         if original_frame is not None:
                             input_sub_remover.preview_frame = cv2.hconcat([original_frame, frame])
-        return processed_frames
         
 if __name__ == '__main__':
-    mask_path = './test.png'
+    mask_path = '../../test/test.png'
     #video_path = '../../test/test.mp4'
     # 记录开始时间
     #start = time.time()
@@ -398,17 +398,12 @@ if __name__ == '__main__':
     #sttn_video_inpaint()
     #print(f'video generated at {sttn_video_inpaint.video_out_path}')
     #print(f'time cost: {time.time() - start}')
-    images_path = './images'
-    images = []
-    for filename in os.listdir(images_path):
+    folder_path = '../../test/images'
+    images_path = []
+    for filename in os.listdir(folder_path):
         print(filename)
-        path = os.path.join(images_path,filename)
-        print(path)
-        images.append(cv2.imread(path))
-    sttn_images_inpaint = STTNImagesInpaint(images, mask_path, clip_gap=config.STTN_MAX_LOAD_NUM)
-    frames = sttn_images_inpaint()
-    frame_index = 1
-    for frame in frames:
-        cv2.imwrite("frame"+str(frame_index)+".png",frame)
-        frame_index = frame_index + 1
+        path = os.path.join(folder_path,filename)
+        images_path.append(path)
+    sttn_images_inpaint = STTNImagesInpaint(images_path, mask_path, clip_gap=config.STTN_MAX_LOAD_NUM)
+    sttn_images_inpaint()
     
